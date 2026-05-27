@@ -23,7 +23,7 @@
   "editor": "stringList",
   "items": {
     "type": "string",
-    "pattern": "https://www.etsy.com/listing/.*"
+    "pattern": "https://www.etsy.com/.*"
   }
 },
     "maxItems": {
