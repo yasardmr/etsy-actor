@@ -1,0 +1,79 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "title": "Etsy Search Results Dataset",
+    "description": "Product data extracted from Etsy search results including title, price, rating, and shop information",
+    "type": "object",
+    "properties": {
+      "productId": {
+        "title": "Product ID",
+        "type": "string",
+        "description": "Unique Etsy listing ID",
+        "example": "1234567890"
+      },
+      "title": {
+        "title": "Product Title",
+        "type": "string",
+        "description": "Product name/title",
+        "example": "Handmade Leather Wallet - Personalized Gift"
+      },
+      "url": {
+        "title": "Product URL",
+        "type": "string",
+        "description": "Direct link to product page",
+        "example": "https://www.etsy.com/listing/1234567890/handmade-leather-wallet"
+      },
+      "price": {
+        "title": "Price",
+        "type": "number",
+        "description": "Product price in USD",
+        "example": 49.99
+      },
+      "rating": {
+        "title": "Rating",
+        "type": "number",
+        "description": "Product rating (0-5 stars)",
+        "example": 4.8
+      },
+      "reviewCount": {
+        "title": "Review Count",
+        "type": "integer",
+        "description": "Total number of customer reviews",
+        "example": 1234
+      },
+      "shopName": {
+        "title": "Shop Name",
+        "type": "string",
+        "description": "Etsy shop/seller name",
+        "example": "LeatherCraftShop"
+      },
+      "shopUrl": {
+        "title": "Shop URL",
+        "type": "string",
+        "description": "Link to seller's shop",
+        "example": "https://www.etsy.com/listing/1234567890/handmade-leather-wallet"
+      },
+      "imageUrl": {
+        "title": "Product Image",
+        "type": "string",
+        "description": "Main product image URL",
+        "example": "https://i.etsystatic.com/12345678/r/il/abc123/1234567890/il_570xN.1234567890_xyz1.jpg"
+      },
+      "scrapedAt": {
+        "title": "Scraped At",
+        "type": "string",
+        "description": "Timestamp when data was collected (ISO 8601 format)",
+        "example": "2025-01-15T10:30:00.000Z"
+      }
+    },
+    "required": ["productId", "title", "url"]
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": ["productId", "title", "price", "rating", "reviewCount", "shopName", "shopUrl", "url", "imageUrl", "scrapedAt"]
+      }
+    }
+  }
+}

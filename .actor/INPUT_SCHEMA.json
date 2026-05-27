@@ -1,0 +1,61 @@
+{
+  "title": "Etsy Search Results Scraper Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search Query",
+      "type": "string",
+      "description": "What to search for on Etsy (e.g., 'handmade jewelry', 'vintage watch', 'ceramic mug')",
+      "prefill": "handmade jewelry",
+      "editor": "textfield"
+    },
+    "searchUrl": {
+      "title": "Search URL (Alternative)",
+      "type": "string",
+      "description": "Direct Etsy search URL (alternative to search query)",
+      "editor": "textfield"
+    },
+    "maxItems": {
+      "title": "Maximum Results",
+      "type": "integer",
+      "description": "Maximum number of products to extract from search results (typical: 60-100 per search page)",
+      "default": 100,
+      "minimum": 1,
+      "maximum": 500,
+      "editor": "number",
+      "prefill": 100
+    },
+    "minRating": {
+      "title": "Minimum Rating",
+      "type": "integer",
+      "description": "Filter products by minimum rating (1-5 stars)",
+      "minimum": 0,
+      "maximum": 5,
+      "editor": "number"
+    },
+    "minReviews": {
+      "title": "Minimum Reviews",
+      "type": "integer",
+      "description": "Filter products by minimum number of reviews",
+      "minimum": 0,
+      "editor": "number"
+    },
+    "priceMin": {
+      "title": "Minimum Price",
+      "type": "integer",
+      "description": "Filter products by minimum price (USD)",
+      "minimum": 0,
+      "editor": "number"
+    },
+    "priceMax": {
+      "title": "Maximum Price",
+      "type": "integer",
+      "description": "Filter products by maximum price (USD)",
+      "minimum": 0,
+      "editor": "number"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

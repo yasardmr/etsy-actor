@@ -1,0 +1,12 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Etsy Search Results Dataset",
+  "description": "Product data extracted from Etsy search results including title, price, rating, and shop information",
+  "properties": {
+    "overview": {
+      "type": "string",
+      "title": "Overview",
+      "template": "{{links.apiDefaultDatasetUrl}}/items?view=overview"
+    }
+  }
+}
