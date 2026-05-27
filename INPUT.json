@@ -1,8 +1,4 @@
 {
-    "productUrls": [
-    "https://www.etsy.com/search?q=lamp&instant_download=false&explicit=1&is_best_seller=true&page=1&order=date_desc&ref=pagination",
-    "https://www.etsy.com/search?q=lamp&instant_download=false&explicit=1&is_best_seller=true&page=2&order=date_desc&ref=pagination",
-    "https://www.etsy.com/search?q=lamp&instant_download=false&explicit=1&is_best_seller=true&page=3&order=date_desc&ref=pagination"
-  ],
+    "searchUrl": "https://www.etsy.com/search?q=handmade+jewelry",
     "maxItems": 5
 }
