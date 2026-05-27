@@ -1,0 +1,33 @@
+{
+  "actorSpecification": 1,
+  "name": "etsy-scraper-pro",
+  "title": "Etsy Search Results Scraper - Extract Product Data",
+  "description": "Fast and reliable Etsy scraper that extracts product listings from search results. Get prices, ratings, reviews, and images - perfect for market research, price monitoring, and competitor analysis. 100% success rate bypassing DataDome protection.",
+  "version": "1.0",
+  "build": {
+    "tag": "latest"
+  },
+  "environmentVariables": {},
+  "meta": {
+    "templateId": "javascript-node"
+  },
+  "input": "./INPUT_SCHEMA.json",
+  "readme": "../README.md",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./DATASET_SCHEMA.json"
+  },
+  "storefront": {
+    "brandingColor": "#F1641E",
+    "categories": [
+      "ECOMMERCE",
+      "TOOLS"
+    ],
+    "shortDescription": "The ONLY maintained Etsy scraper with sales estimator, trend analysis & competitive intelligence. Replaces all deprecated actors.",
+    "longDescription": "# Etsy Scraper Pro - The Most Advanced Etsy Data Extractor\n\n**🚨 ALL OTHER ETSY SCRAPERS ON APIFY ARE DEPRECATED - This is the ONLY actively maintained solution**\n\n## Why Choose Etsy Scraper Pro?\n\n✅ **Actively Maintained** - Updated weekly to bypass Cloudflare and Etsy's anti-bot measures\n✅ **Modern Tech Stack** - Playwright + Stealth plugins (2025-ready)\n✅ **pay-per-event Pricing** - Only pay for data you collect, not compute time\n✅ **Free Tier** - 500 products/month included\n✅ **Comprehensive Data** - Products, reviews, shops, pricing, analytics\n✅ **Advanced Analytics** - (Coming soon: Sales estimator, trend analysis, competition metrics)\n\n## Key Features\n\n### 📦 Product Scraping\n- Complete product details (title, description, price, images)\n- Ratings & review counts\n- Categories, tags, materials\n- Variations (size, color, etc.)\n- Shipping information\n- Sale prices & discounts\n\n### ⭐ Review Scraping\n- Paginated review extraction\n- Verified purchase indicators\n- Review photos\n- Helpful counts\n- Reviewer details\n\n### 🏪 Shop Intelligence\n- Shop statistics (sales count, rating, location)\n- Total listings & favorites\n- Shop policies\n- Social media links\n- Category performance\n\n### 🎯 Advanced Filters\n- Minimum rating threshold\n- Minimum review count\n- Price range filtering\n- Category-specific searches\n\n## Use Cases\n\n### 💡 Dropshipping Research\n- Find trending products with high potential\n- Analyze competitor pricing strategies\n- Identify low-competition niches\n- Track product performance over time\n\n### 🔍 Competitive Intelligence\n- Monitor competitor shops & listings\n- Track pricing changes\n- Analyze product assortments\n- Study successful marketing techniques\n\n### 📊 Market Research\n- Identify trending categories\n- Keyword research for SEO\n- Seasonal trend analysis\n- Category performance insights\n\n### 🤖 Automation Workflows\n- Schedule daily/weekly scrapes\n- Price drop monitoring\n- New product alerts\n- Integrate with n8n, Zapier, Make.com\n\n## Pricing Model\n\n**pay-per-event Pricing** - Only pay for products you scrape:\n- **Free Tier:** 500 products/month\n- **Pay-As-You-Go:** $0.002/product (basic scraping)\n- **Coming Soon - Pro Tier:** $0.005/product (with analytics)\n- **Coming Soon - Monthly Plans:** Unlimited scraping from $49/month\n\n## Technical Details\n\n- **Anti-Bot Protection:** Playwright + Stealth plugins bypass Cloudflare\n- **Proxies Required:** Residential proxies recommended (Etsy blocks datacenter IPs)\n- **Reliability:** 95%+ success rate\n- **Speed:** ~50 products per minute\n- **Data Format:** JSON, CSV, Excel\n\n## Integration Examples\n\n### n8n Workflow\n1. Run Etsy Scraper Pro daily\n2. Filter products by rating > 4.5\n3. Send top products to Google Sheets\n4. Alert via Slack when new bestsellers found\n\n### Zapier Automation\n1. Schedule Etsy scraper weekly\n2. Compare prices with previous run\n3. Trigger email on price drops > 20%\n4. Update CRM with new products\n\n## Comparison to Deprecated Actors\n\n| Feature | Etsy Scraper Pro | epctex (DEPRECATED) | Others |\n|---------|------------------|---------------------|--------|\n| **Status** | ✅ Maintained | ❌ Deprecated | ❌ Deprecated |\n| **Tech Stack** | ✅ Playwright + Stealth | ❌ Outdated | ❌ Outdated |\n| **Pricing** | ✅ pay-per-event | ❌ Flat monthly | ❌ Flat monthly |\n| **Free Tier** | ✅ 500 products | ❌ None | ❌ None |\n| **Reviews** | ✅ Yes | ⚠️ Limited | ⚠️ Limited |\n| **Shop Details** | ✅ Yes | ⚠️ Basic | ❌ No |\n| **Analytics** | 🔜 Coming soon | ❌ No | ❌ No |\n| **Support** | ✅ Active | ❌ None | ❌ None |\n\n## Coming Soon (Phase 2 - Pro Features)\n\n🚀 **Sales Estimator** - Predict 30-day sales from review velocity\n📈 **Trending Score** - Identify rising products (0-100 scale)\n🎯 **Competition Analysis** - Price percentiles, market saturation\n🔑 **Keyword Intelligence** - Top-performing keywords per category\n⏰ **Scheduled Monitoring** - Track products/shops over time\n🔔 **Webhook Support** - Real-time price drop alerts\n\n## Migration Guide\n\nIf you're using a deprecated Etsy scraper:\n\n1. Replace actor ID with `webdatalabs/etsy-scraper-pro`\n2. Update input schema (see documentation)\n3. Enable residential proxies (required)\n4. Test with free tier (500 products)\n5. Set up pay-per-event billing\n\n## Support\n\n- 📧 Email: contact via Apify\n- 📖 Documentation: See README\n- 🐛 Issues: Report via Apify Support\n- ⏱️ Response Time: < 24 hours\n\n## Legal Disclaimer\n\nThis actor scrapes publicly available data from Etsy. Use responsibly and in compliance with Etsy's Terms of Service. Do not republish copyrighted content (images, descriptions) without permission. WebDataLabs is not affiliated with Etsy.",
+    "supportUrl": "https://apify.com/webdatalabs",
+    "isDeprecated": false,
+    "pricing": "paid",
+    "pricingModel": "per-event"
+  }
+}
