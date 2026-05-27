@@ -1,0 +1,5 @@
+{
+  "query": "handmade bracelet",
+  "maxItems": 3,
+  "maxConcurrency": 1
+}

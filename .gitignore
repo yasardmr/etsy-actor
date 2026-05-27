@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+*.js.map
+
+# Apify storage
+storage/
+apify_storage/
+.apify/
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+test-*.json
+test-*.js
+INPUT-TEST.json
+INPUT_TEST.json
+**/INPUT-TEST.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Debug files
+*.png
+*.html
+*.jpg
+*.jpeg
