@@ -16,16 +16,6 @@
     "description": "Direct Etsy search URL (alternative to search query)",
     "editor": "textfield"
 },
-    "productUrls": {
-  "title": "Ürün URL Listesi",
-  "type": "array",
-  "description": "Doğrudan taramak istediğin Etsy ürün URL'leri (query yerine kullanılabilir)",
-  "editor": "stringList",
-  "items": {
-    "type": "string",
-    "pattern": "https://www.etsy.com/.*"
-  }
-},
     "maxItems": {
       "title": "Maximum Results",
       "type": "integer",
