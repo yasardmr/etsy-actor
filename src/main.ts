@@ -42,23 +42,17 @@ class EtsyScraper {
         router.addHandler('SEARCH', async ({ page, request, crawler, proxyInfo }) => {
             // Extract query from URL or use input query
             let searchQuery = this.input.query || '';
+            if (this.input.searchUrl) {
+                const urlMatch = this.input.searchUrl.match(/[?&]q=([^&]+)/);
+                if (urlMatch) {
+                    searchQuery = decodeURIComponent(urlMatch[1].replace(/\+/g, ' '));
+                }
+            }
 
-// searchUrl input'tan al
-if (!searchQuery && this.input.searchUrl) {
-    const urlMatch = this.input.searchUrl.match(/[?&]q=([^&]+)/);
-    if (urlMatch) searchQuery = decodeURIComponent(urlMatch[1].replace(/\+/g, ' '));
-}
-
-// Gelen request URL'inden al (pagination URL'leri için)
-if (!searchQuery) {
-    const urlMatch = request.url.match(/[?&]q=([^&]+)/);
-    if (urlMatch) searchQuery = decodeURIComponent(urlMatch[1].replace(/\+/g, ' '));
-}
-
-if (!searchQuery) {
-    throw new Error('No search query');
-}
-
+            if (!searchQuery) {
+                console.log('   ❌ No search query specified');
+                throw new Error('No search query');
+            }
             console.log(`🔍 Will search for: "${searchQuery}"`);
 
             // Wait for homepage to load
