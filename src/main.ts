@@ -208,6 +208,10 @@ class EtsyScraper {
                 const listings = document.querySelectorAll('[data-palette-listing-id]');
 
                 listings.forEach((listing: any) => {
+                    const popularNowSignal = listing.querySelector('clg-signal');
+                     if (!popularNowSignal) return;
+                     const signalText = popularNowSignal.textContent?.trim().toLowerCase();
+                    if (signalText !== 'popular now') return;
                     try {
                         // Product link and ID
                         const link = listing.querySelector('a[href*="/listing/"]');
