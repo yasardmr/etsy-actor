@@ -11,11 +11,14 @@
       "editor": "textfield"
     },
     "searchUrl": {
-      "title": "Search URL (Alternative)",
-      "type": "string",
-      "description": "Direct Etsy search URL (alternative to search query)",
-      "editor": "textfield"
-    },
+  "title": "Search URLs",
+  "type": "array",
+  "description": "Multiple Etsy search URLs",
+  "editor": "stringList",
+  "items": {
+    "type": "string"
+  }
+},
     "maxItems": {
       "title": "Maximum Results",
       "type": "integer",
