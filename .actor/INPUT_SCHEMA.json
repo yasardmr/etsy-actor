@@ -17,6 +17,24 @@
       "editor": "textfield",
       "prefill": "https://www.etsy.com/search?q=lamp&instant_download=false&explicit=1&is_best_seller=true&page=1&order=date_desc&ref=pagination"
     },
+    "searchUrls": {
+      "title": "Multiple search URLs",
+      "type": "array",
+      "description": "Optional list of Etsy search URLs to scrape one after another (each can use maxPages for pagination).",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      }
+    },
+    "maxPages": {
+      "title": "Maximum search pages",
+      "type": "integer",
+      "description": "How many result pages to open per search (page=1, page=2, ...). Stops early when maxItems is reached or a page has no listings.",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 50,
+      "editor": "number"
+    },
     "maxItems": {
       "title": "Maximum Results",
       "type": "integer",
