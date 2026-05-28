@@ -5,12 +5,14 @@ export const InputSchema = z.object({
     // Search parameters
     query: z.string().optional(),
     searchUrl: z.string().optional(),
+    searchUrls: z.array(z.string()).optional(),
     categoryUrl: z.string().url().optional(),
     shopUrl: z.string().url().optional(),
     productUrls: z.array(z.string().url()).optional(),
 
     // Limits
     maxItems: z.number().int().min(0).default(100),
+    maxPages: z.number().int().min(1).max(50).default(1),
     maxReviewsPerProduct: z.number().int().min(0).default(10),
 
     // Filters
