@@ -42,12 +42,8 @@ class EtsyScraper {
         router.addHandler('SEARCH', async ({ page, request, crawler, proxyInfo }) => {
             // Extract query from URL or use input query
             let searchQuery = this.input.query || '';
-            const runSearchUrl = request.url.match(/[?&]_actorSearchUrl=([^&]+)/)?.[1];
-            const effectiveSearchUrl = runSearchUrl
-                ? decodeURIComponent(runSearchUrl)
-                : this.getSearchUrls()[0];
-            if (effectiveSearchUrl) {
-                const urlMatch = effectiveSearchUrl.match(/[?&]q=([^&]+)/);
+            if (this.input.searchUrl) {
+                const urlMatch = this.input.searchUrl.match(/[?&]q=([^&]+)/);
                 if (urlMatch) {
                     searchQuery = decodeURIComponent(urlMatch[1].replace(/\+/g, ' '));
                 }
@@ -93,69 +89,60 @@ class EtsyScraper {
             await humanBehavior.randomMouseMovements(3);
             await this.naturalDelay(1000, 2000);
 
-            if (effectiveSearchUrl && request.url !== effectiveSearchUrl) {
-                console.log(`   🔗 Navigating directly to search URL...`);
-                await page.goto(effectiveSearchUrl, {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 60000,
-                });
-                await this.naturalDelay(2000, 3000);
-            } else if (!effectiveSearchUrl) {
-                // Find the search input - try multiple selectors
-                console.log('   📝 Looking for search input...');
-                const searchSelectors = [
-                    'input#global-enhancements-search-query',
-                    'input[name="search_query"]',
-                    'input[placeholder*="Search"]',
-                    'input[type="search"]',
-                    '#search-query',
-                    '.wt-input-btn-group input',
-                ];
+            // Find the search input - try multiple selectors
+            console.log('   📝 Looking for search input...');
+            const searchSelectors = [
+                'input#global-enhancements-search-query',
+                'input[name="search_query"]',
+                'input[placeholder*="Search"]',
+                'input[type="search"]',
+                '#search-query',
+                '.wt-input-btn-group input',
+            ];
 
-                let searchInput = null;
-                for (const selector of searchSelectors) {
-                    searchInput = await page.$(selector);
-                    if (searchInput) {
-                        const isVisible = await searchInput.isVisible().catch(() => false);
-                        if (isVisible) {
-                            console.log(`   ✅ Found search input: ${selector}`);
-                            break;
-                        }
+            let searchInput = null;
+            for (const selector of searchSelectors) {
+                searchInput = await page.$(selector);
+                if (searchInput) {
+                    const isVisible = await searchInput.isVisible().catch(() => false);
+                    if (isVisible) {
+                        console.log(`   ✅ Found search input: ${selector}`);
+                        break;
                     }
-                    searchInput = null;
                 }
+                searchInput = null;
+            }
 
-                if (!searchInput) {
-                    // Log what inputs exist on the page for debugging
-                    const inputs = await page.$$eval('input', (els: any[]) =>
-                        els.map((el: any) => ({ id: el.id, name: el.name, type: el.type, placeholder: el.placeholder }))
-                    );
-                    console.log('   Available inputs:', JSON.stringify(inputs.slice(0, 10)));
-                    throw new Error('Search input not found');
-                }
+            if (!searchInput) {
+                // Log what inputs exist on the page for debugging
+                const inputs = await page.$$eval('input', (els: any[]) =>
+                    els.map((el: any) => ({ id: el.id, name: el.name, type: el.type, placeholder: el.placeholder }))
+                );
+                console.log('   Available inputs:', JSON.stringify(inputs.slice(0, 10)));
+                throw new Error('Search input not found');
+            }
 
-                // Click the search input
-                await searchInput.click();
-                await this.naturalDelay(300, 600);
+            // Click the search input
+            await searchInput.click();
+            await this.naturalDelay(300, 600);
 
-                // Type the query with human-like delays
-                console.log(`   ⌨️ Typing: "${searchQuery}"`);
-                for (const char of searchQuery) {
-                    await page.keyboard.type(char, { delay: 50 + Math.random() * 100 });
-                }
-                await this.naturalDelay(500, 1000);
+            // Type the query with human-like delays
+            console.log(`   ⌨️ Typing: "${searchQuery}"`);
+            for (const char of searchQuery) {
+                await page.keyboard.type(char, { delay: 50 + Math.random() * 100 });
+            }
+            await this.naturalDelay(500, 1000);
 
-                // Press Enter to search
-                console.log('   ⏎ Pressing Enter...');
-                await page.keyboard.press('Enter');
+            // Press Enter to search
+            console.log('   ⏎ Pressing Enter...');
+            await page.keyboard.press('Enter');
 
-                // Wait for search results
-                try {
-                    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
-                    await this.naturalDelay(2000, 3000);
-                } catch (e) {
-                    console.log('   ⚠️ Timeout waiting for search results');
-                }
+            // Wait for search results
+            try {
+                await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+                await this.naturalDelay(2000, 3000);
+            } catch (e) {
+                console.log('   ⚠️ Timeout waiting for search results');
             }
 
             // Simulate reading results
@@ -616,14 +603,11 @@ class EtsyScraper {
 
     private generateStartUrls(): string[] {
         const urls: string[] = [];
-        const searchUrls = this.getSearchUrls();
 
-        // For query OR search URLs, start from homepage first
-        if (this.input.query) {
+        // For search queries OR search URLs, use homepage approach
+        // (Direct search URL navigation gets blocked by DataDome)
+        if (this.input.query || this.input.searchUrl) {
             urls.push('https://www.etsy.com');
-        }
-        for (const searchUrl of searchUrls) {
-            urls.push(`https://www.etsy.com/?_actorSearchUrl=${encodeURIComponent(searchUrl)}`);
         }
 
         if (this.input.categoryUrl) urls.push(this.input.categoryUrl);
@@ -636,11 +620,6 @@ class EtsyScraper {
         }
 
         return urls;
-    }
-
-    private getSearchUrls(): string[] {
-        if (!this.input.searchUrl) return [];
-        return Array.isArray(this.input.searchUrl) ? this.input.searchUrl : [this.input.searchUrl];
     }
 
     /**
