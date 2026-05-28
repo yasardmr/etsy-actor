@@ -11,19 +11,21 @@
       "editor": "textfield"
     },
     "searchUrl": {
-    "title": "Search URL (Alternative)",
-    "type": "string",
-    "description": "Direct Etsy search URL (alternative to search query)",
-    "editor": "textfield"
-},
-    "searchUrls": {
-      "title": "Search URLs (Multiple)",
-      "type": "array",
-      "description": "Multiple Etsy search URLs. Each URL's q parameter will be searched.",
-      "editor": "stringList",
-      "items": {
-        "type": "string"
-      }
+      "title": "Search URL (Alternative)",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Direct Etsy search URL (alternative to search query)"
+        },
+        {
+          "type": "array",
+          "description": "Multiple Etsy search URLs to process in one run",
+          "items": {
+            "type": "string"
+          }
+        }
+      ],
+      "editor": "textfield"
     },
     "maxItems": {
       "title": "Maximum Results",
