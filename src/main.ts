@@ -76,11 +76,12 @@ class EtsyScraper {
             const humanBehavior = new HumanBehavior(page);
             await humanBehavior.initialize();
 
-            console.log('   🔥 Simulating human behavior on homepage...');
-            await this.naturalDelay(2000, 3000);
-            await humanBehavior.naturalScroll(2);
-            await humanBehavior.randomMouseMovements(3);
-            await this.naturalDelay(1000, 2000);
+            const lightHomepage = this.input.maxPages > 1;
+            console.log(`   🔥 Simulating human behavior on homepage${lightHomepage ? ' (light)' : ''}...`);
+            await this.naturalDelay(lightHomepage ? 1000 : 2000, lightHomepage ? 1500 : 3000);
+            await humanBehavior.naturalScroll(lightHomepage ? 1 : 2);
+            await humanBehavior.randomMouseMovements(lightHomepage ? 1 : 3);
+            await this.naturalDelay(lightHomepage ? 500 : 1000, lightHomepage ? 1000 : 2000);
 
             let querySearchDone = false;
 
@@ -220,9 +221,12 @@ class EtsyScraper {
             }
         });
 
+        // Homepage + DataDome + N pages with human delays can exceed 120s (see maxPages)
+        const requestHandlerTimeoutSecs = Math.min(900, 180 + this.input.maxPages * 90);
+
         const crawler = new PlaywrightCrawler({
             proxyConfiguration,
-            requestHandlerTimeoutSecs: 120,
+            requestHandlerTimeoutSecs,
             useSessionPool: true,
             persistCookiesPerSession: true,
             requestHandler: router,
@@ -291,7 +295,7 @@ class EtsyScraper {
         });
 
         const startUrls = this.generateStartUrls();
-        console.log(`🚀 Starting scraper with ${startUrls.length} URLs\n`);
+        console.log(`🚀 Starting scraper with ${startUrls.length} URLs (handler timeout: ${requestHandlerTimeoutSecs}s)\n`);
 
         await crawler.run(startUrls.map(url => {
             // Determine label based on URL type
@@ -408,16 +412,27 @@ class EtsyScraper {
         const maxPages = this.input.maxPages;
 
         for (let pageNum = 1; pageNum <= maxPages && this.itemCount < this.input.maxItems; pageNum++) {
+            if (page.isClosed()) {
+                console.log('   ⚠️ Browser page closed, stopping pagination');
+                break;
+            }
+
             if (pageNum > 1) {
                 const nextUrl = this.buildSearchPageUrl(baseSearchUrl, pageNum);
                 console.log(`   📄 Opening page ${pageNum}: ${nextUrl}`);
                 await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                await this.naturalDelay(2000, 3000);
+                await this.naturalDelay(1000, 1500);
             }
 
-            await humanBehavior.naturalScroll(2);
-            await humanBehavior.randomMouseMovements(2);
-            await this.naturalDelay(1000, 2000);
+            // First results page: fuller simulation; later pages: faster to avoid handler timeout
+            if (pageNum === 1) {
+                await humanBehavior.naturalScroll(2);
+                await humanBehavior.randomMouseMovements(2);
+                await this.naturalDelay(1000, 2000);
+            } else {
+                await humanBehavior.naturalScroll(1);
+                await this.naturalDelay(500, 1000);
+            }
             await this.resolveDataDomeBlock(page, proxyInfo, `search results page ${pageNum}`);
 
             const pageTitle = await page.title();
