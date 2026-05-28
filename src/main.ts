@@ -41,18 +41,16 @@ class EtsyScraper {
         // Handle search pages
         router.addHandler('SEARCH', async ({ page, request, crawler, proxyInfo }) => {
             // Extract query from URL or use input query
-            let searchQuery = this.input.query || '';
-            if (this.input.searchUrl) {
-                const urlMatch = this.input.searchUrl.match(/[?&]q=([^&]+)/);
-                if (urlMatch) {
-                    searchQuery = decodeURIComponent(urlMatch[1].replace(/\+/g, ' '));
-                }
+            let searchQuery = (request.userData?.searchQuery as string) || this.input.query || '';
+            if (!searchQuery && this.input.searchUrl) {
+                searchQuery = this.extractQueryFromSearchUrl(this.input.searchUrl);
             }
 
             if (!searchQuery) {
                 console.log('   ❌ No search query specified');
                 throw new Error('No search query');
             }
+
             console.log(`🔍 Will search for: "${searchQuery}"`);
 
             // Wait for homepage to load
@@ -581,44 +579,69 @@ class EtsyScraper {
             ],
         });
 
-        const startUrls = this.generateStartUrls();
-        console.log(`🚀 Starting scraper with ${startUrls.length} URLs\n`);
-
-        await crawler.run(startUrls.map(url => {
-            // Determine label based on URL type
-            let label = 'SEARCH';
-            if (url.includes('/listing/')) {
-                label = 'PRODUCT';
-            } else if (url.includes('/shop/')) {
-                label = 'SHOP';
-            } else if (url.includes('/c/')) {
-                label = 'CATEGORY';
-            }
-            return { url, label };
-        }));
+        const startRequests = this.generateStartRequests();
+        console.log(`🚀 Starting scraper with ${startRequests.length} URLs\n`);
+        await crawler.run(startRequests);
 
         console.log(`\n✅ Complete! Scraped ${this.itemCount} products`);
     }
 
-    private generateStartUrls(): string[] {
-        const urls: string[] = [];
+    private generateStartRequests(): Array<{ url: string; label: string; uniqueKey?: string; userData?: Record<string, unknown> }> {
+        const requests: Array<{ url: string; label: string; uniqueKey?: string; userData?: Record<string, unknown> }> = [];
 
         // For search queries OR search URLs, use homepage approach
         // (Direct search URL navigation gets blocked by DataDome)
-        if (this.input.query || this.input.searchUrl) {
-            urls.push('https://www.etsy.com');
+        const searchQueries = this.getSearchQueries();
+        if (searchQueries.length > 0) {
+            for (const [index, query] of searchQueries.entries()) {
+                requests.push({
+                    url: 'https://www.etsy.com',
+                    label: 'SEARCH',
+                    uniqueKey: `search-${index}-${encodeURIComponent(query)}`,
+                    userData: { searchQuery: query },
+                });
+            }
         }
 
-        if (this.input.categoryUrl) urls.push(this.input.categoryUrl);
-        if (this.input.shopUrl) urls.push(this.input.shopUrl);
-        if (this.input.productUrls) urls.push(...this.input.productUrls);
+        if (this.input.categoryUrl) requests.push({ url: this.input.categoryUrl, label: 'CATEGORY' });
+        if (this.input.shopUrl) requests.push({ url: this.input.shopUrl, label: 'SHOP' });
+        if (this.input.productUrls) {
+            requests.push(...this.input.productUrls.map((url) => ({ url, label: 'PRODUCT' })));
+        }
 
         // Default to homepage if nothing specified
-        if (urls.length === 0) {
-            urls.push('https://www.etsy.com');
+        if (requests.length === 0) {
+            requests.push({ url: 'https://www.etsy.com', label: 'SEARCH' });
         }
 
-        return urls;
+        return requests;
+    }
+
+    private getSearchQueries(): string[] {
+        const queries = new Set<string>();
+
+        if (this.input.query?.trim()) {
+            queries.add(this.input.query.trim());
+        }
+
+        if (this.input.searchUrl) {
+            const queryFromUrl = this.extractQueryFromSearchUrl(this.input.searchUrl);
+            if (queryFromUrl) queries.add(queryFromUrl);
+        }
+
+        if (this.input.searchUrls?.length) {
+            for (const searchUrl of this.input.searchUrls) {
+                const queryFromUrl = this.extractQueryFromSearchUrl(searchUrl);
+                if (queryFromUrl) queries.add(queryFromUrl);
+            }
+        }
+
+        return Array.from(queries);
+    }
+
+    private extractQueryFromSearchUrl(searchUrl: string): string {
+        const urlMatch = searchUrl.match(/[?&]q=([^&]+)/);
+        return urlMatch ? decodeURIComponent(urlMatch[1].replace(/\+/g, ' ')) : '';
     }
 
     /**
