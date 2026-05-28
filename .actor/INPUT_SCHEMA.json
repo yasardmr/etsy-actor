@@ -16,6 +16,15 @@
     "description": "Direct Etsy search URL (alternative to search query)",
     "editor": "textfield"
 },
+    "searchUrls": {
+      "title": "Search URLs (Multiple)",
+      "type": "array",
+      "description": "Multiple Etsy search URLs. Each URL's q parameter will be searched.",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      }
+    },
     "maxItems": {
       "title": "Maximum Results",
       "type": "integer",
