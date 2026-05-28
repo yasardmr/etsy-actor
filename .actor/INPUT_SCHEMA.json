@@ -11,11 +11,12 @@
       "editor": "textfield"
     },
     "searchUrl": {
-    "title": "Search URL (Alternative)",
-    "type": "string",
-    "description": "Direct Etsy search URL (alternative to search query)",
-    "editor": "textfield"
-},
+      "title": "Search URL (with filters)",
+      "type": "string",
+      "description": "Full Etsy search URL including filters and sort (e.g. is_best_seller, order=date_desc). When set, the actor opens this exact URL instead of typing only the q= keyword.",
+      "editor": "textfield",
+      "prefill": "https://www.etsy.com/search?q=lamp&instant_download=false&explicit=1&is_best_seller=true&page=1&order=date_desc&ref=pagination"
+    },
     "maxItems": {
       "title": "Maximum Results",
       "type": "integer",
