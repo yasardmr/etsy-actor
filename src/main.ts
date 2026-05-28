@@ -18,6 +18,7 @@ import { DataDomeSolver } from './datadome-solver.js';
 class EtsyScraper {
     private input: ValidatedInput;
     private itemCount = 0;
+    private seenProductIds = new Set<string>();
     private sessionWarmedUp = false;
     private dataDomeSolver: DataDomeSolver;
 
@@ -40,21 +41,13 @@ class EtsyScraper {
 
         // Handle search pages
         router.addHandler('SEARCH', async ({ page, request, crawler, proxyInfo }) => {
-            const directSearchUrl = this.input.searchUrl?.trim()
-                ? this.normalizeEtsySearchUrl(this.input.searchUrl.trim())
-                : null;
-
-            let searchQuery = '';
-            if (!directSearchUrl) {
-                searchQuery = this.input.query || '';
-                if (!searchQuery) {
-                    console.log('   ❌ No search query or searchUrl specified');
-                    throw new Error('No search query or searchUrl');
-                }
-                console.log(`🔍 Will search for: "${searchQuery}"`);
-            } else {
-                console.log(`🔗 Using full search URL (all filters preserved): ${directSearchUrl}`);
+            const searchTargets = this.getSearchTargets();
+            if (searchTargets.length === 0) {
+                console.log('   ❌ No search query or searchUrl specified');
+                throw new Error('No search query or searchUrl');
             }
+
+            console.log(`📑 ${searchTargets.length} search target(s), up to ${this.input.maxPages} page(s) each\n`);
 
             // Wait for homepage to load
             try {
@@ -89,91 +82,368 @@ class EtsyScraper {
             await humanBehavior.randomMouseMovements(3);
             await this.naturalDelay(1000, 2000);
 
-            if (directSearchUrl) {
-                // Preserve full URL params (best seller, sort order, filters, etc.)
-                console.log('   🌐 Navigating to search URL...');
-                await page.goto(directSearchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                await this.naturalDelay(2000, 3000);
-            } else {
-                // Find the search input - try multiple selectors
-                console.log('   📝 Looking for search input...');
-                const searchSelectors = [
-                    'input#global-enhancements-search-query',
-                    'input[name="search_query"]',
-                    'input[placeholder*="Search"]',
-                    'input[type="search"]',
-                    '#search-query',
-                    '.wt-input-btn-group input',
-                ];
+            let querySearchDone = false;
 
-                let searchInput = null;
-                for (const selector of searchSelectors) {
-                    searchInput = await page.$(selector);
-                    if (searchInput) {
-                        const isVisible = await searchInput.isVisible().catch(() => false);
-                        if (isVisible) {
-                            console.log(`   ✅ Found search input: ${selector}`);
-                            break;
-                        }
-                    }
-                    searchInput = null;
-                }
+            for (let targetIndex = 0; targetIndex < searchTargets.length; targetIndex++) {
+                if (this.itemCount >= this.input.maxItems) break;
 
-                if (!searchInput) {
-                    const inputs = await page.$$eval('input', (els: any[]) =>
-                        els.map((el: any) => ({ id: el.id, name: el.name, type: el.type, placeholder: el.placeholder }))
-                    );
-                    console.log('   Available inputs:', JSON.stringify(inputs.slice(0, 10)));
-                    throw new Error('Search input not found');
-                }
+                const target = searchTargets[targetIndex];
+                let baseSearchUrl: string;
 
-                await searchInput.click();
-                await this.naturalDelay(300, 600);
-
-                console.log(`   ⌨️ Typing: "${searchQuery}"`);
-                for (const char of searchQuery) {
-                    await page.keyboard.type(char, { delay: 50 + Math.random() * 100 });
-                }
-                await this.naturalDelay(500, 1000);
-
-                console.log('   ⏎ Pressing Enter...');
-                await page.keyboard.press('Enter');
-
-                try {
-                    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+                if (target.type === 'url') {
+                    console.log(`\n🔗 Search ${targetIndex + 1}/${searchTargets.length}: ${target.url}`);
+                    await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
                     await this.naturalDelay(2000, 3000);
-                } catch (e) {
-                    console.log('   ⚠️ Timeout waiting for search results');
+                    baseSearchUrl = target.url;
+                } else {
+                    if (querySearchDone) continue;
+                    console.log(`\n🔍 Search by query: "${target.query}"`);
+                    await this.submitQuerySearch(page, target.query);
+                    querySearchDone = true;
+                    baseSearchUrl = page.url();
                 }
+
+                await this.scrapeSearchResultPages(page, humanBehavior, proxyInfo, baseSearchUrl, targetIndex);
+            }
+        });
+
+        // Handle product pages (Direct access or if configured)
+        router.addHandler('PRODUCT', async ({ page, request, proxyInfo }) => {
+            console.log(`📦 Scraping product: ${request.url}`);
+
+            // Initialize human behavior
+            const humanBehavior = new HumanBehavior(page);
+            await humanBehavior.initialize();
+
+            try {
+                await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+                await this.naturalDelay(1000, 2000);
+            } catch (e) {
+                console.log('   ⚠️ Timeout waiting for page load');
             }
 
-            // Simulate reading results
+            // Basic anti-bot movements
             await humanBehavior.naturalScroll(2);
-            await humanBehavior.randomMouseMovements(2);
-            await this.naturalDelay(1000, 2000);
 
-            // Check for blocking on search results
-            isBlocked = await this.dataDomeSolver.isBlocked(page);
+            // Check for blocking
+            const isBlocked = await this.dataDomeSolver.isBlocked(page);
             if (isBlocked) {
-                console.log('   ⚠️ Challenge detected on search results');
                 const solved = await this.dataDomeSolver.solveDataDome(page, proxyInfo);
                 if (!solved) {
-                    throw new Error('Search results blocked');
+                    throw new Error('Page blocked');
                 }
                 await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
             }
 
-            // Debug info
+            const product = await page.evaluate(() => {
+                try {
+                    // Basic Info
+                    const title = document.querySelector('h1')?.textContent?.trim() || '';
+                    const productId = window.location.href.match(/\/listing\/(\d+)/)?.[1] || '';
+                    
+                    // Price
+                    let price = 0;
+                    const priceEl = document.querySelector('[data-selector="price-only"]') || 
+                                   document.querySelector('.wt-text-title-03') ||
+                                   document.querySelector('[class*="price"]');
+                    if (priceEl) {
+                        const match = priceEl.textContent?.match(/[\d,]+\.?\d*/);
+                        if (match) price = parseFloat(match[0].replace(/,/g, ''));
+                    }
+
+                    // Shop Name - USING USER'S SELECTOR as primary method
+                    // Selector: #product_details_content_toggle > div > div:nth-child(1) > ul > div > li > div.wt-ml-xs-1.how-its-made-label-product-details > a
+                    let shopName = '';
+                    let shopUrl = '';
+                    
+                    // User provided selector (xpath style adapted to CSS)
+                    const userSelector = '#product_details_content_toggle > div > div:nth-child(1) > ul > div > li > div.wt-ml-xs-1.how-its-made-label-product-details > a';
+                    const userShopEl = document.querySelector(userSelector);
+                    
+                    if (userShopEl) {
+                        shopName = userShopEl.textContent?.trim() || '';
+                        shopUrl = userShopEl.getAttribute('href') || '';
+                    }
+                    
+                    // Fallback selectors for shop name
+                    if (!shopName) {
+                        const shopHeader = document.querySelector('a[href*="/shop/"]');
+                        if (shopHeader) {
+                            shopName = shopHeader.textContent?.trim() || '';
+                            shopUrl = shopHeader.getAttribute('href') || '';
+                        }
+                    }
+
+                    // Rating & Reviews
+                    let rating = 0;
+                    let reviewCount = 0;
+                    const reviewsBadge = document.querySelector('#reviews-link') || document.querySelector('a[href="#reviews"]');
+                    if (reviewsBadge) {
+                         const text = reviewsBadge.textContent || '';
+                         const countMatch = text.match(/(\d+)/);
+                         if (countMatch) reviewCount = parseInt(countMatch[1]);
+                         
+                         // Try to find rating stars near reviews
+                         const stars = document.querySelector('input[name="rating"]');
+                         if (stars) rating = parseFloat(stars.getAttribute('value') || '0');
+                    }
+
+                    const imageUrl = document.querySelector('img.wt-image')?.getAttribute('src') || '';
+
+                    if (shopUrl && !shopUrl.startsWith('http')) {
+                        shopUrl = `https://www.etsy.com${shopUrl}`;
+                    }
+
+                    return {
+                        productId,
+                        title,
+                        url: window.location.href,
+                        price,
+                        rating,
+                        reviewCount,
+                        shopName: shopName || 'N/A',
+                        shopUrl: shopUrl || '',
+                        imageUrl,
+                        scrapedAt: new Date().toISOString(),
+                    } as EtsyProduct;
+                } catch (e) {
+                    return null;
+                }
+            });
+
+            if (product && product.title) {
+                console.log(`   ✅ "${product.title.substring(0, 50)}..." | Shop: ${product.shopName}`);
+                await this.pushProduct(product);
+                this.itemCount++;
+            } else {
+                console.log('   ❌ Failed to extract product details');
+            }
+        });
+
+        const crawler = new PlaywrightCrawler({
+            proxyConfiguration,
+            requestHandlerTimeoutSecs: 120,
+            useSessionPool: true,
+            persistCookiesPerSession: true,
+            requestHandler: router,
+
+            // CRITICAL: Rate limiting to avoid DataDome detection on product pages
+            // Product pages get detected when navigating too fast
+            minConcurrency: 1,
+            maxConcurrency: 1, // Force sequential processing (ignore input)
+            maxRequestsPerMinute: 12, // ~5 seconds between requests
+
+            // DISABLE Crawlee's fingerprinting - let rebrowser-playwright handle it
+            // Crawlee's fingerprint injection can interfere with rebrowser's CDP patches
+            browserPoolOptions: {
+                useFingerprints: false,
+            },
+
+            sessionPoolOptions: {
+                blockedStatusCodes: [], // DataDome uses 403s, don't mark as blocked
+                maxPoolSize: 10,
+            },
+
+            launchContext: {
+                // CRITICAL: Use rebrowser-playwright for CDP detection evasion
+                // This patches Chrome DevTools Protocol which DataDome monitors
+                launcher: chromium,
+                launchOptions: {
+                    headless: false, // IMPORTANT: headless mode has different fingerprints
+                },
+            },
+
+            preNavigationHooks: [
+                async ({ request, page }, gotoOptions) => {
+                    // NOTE: rebrowser-playwright handles CDP detection
+                    // Don't inject manual anti-detection scripts - they can interfere
+
+                    // Set realistic viewport (common desktop resolution)
+                    await page.setViewportSize({
+                        width: 1920,
+                        height: 1080
+                    });
+
+                    // BLOCKING: Reduce bandwidth by blocking unnecessary resources
+                    await page.route('**/*', (route: any) => {
+                        const request = route.request();
+                        const resourceType = request.resourceType();
+                        const url = request.url();
+
+                        // Block heavy resources (NOT stylesheets - blocking CSS is a detection vector)
+                        if (['image', 'media', 'font'].includes(resourceType)) {
+                            return route.abort();
+                        }
+
+                        // Block specific analytics and tracking scripts (optional but good for speed)
+                        if (url.includes('google-analytics') || url.includes('facebook.net') || url.includes('doubleclick')) {
+                            return route.abort();
+                        }
+
+                        // Continue all other requests
+                        return route.continue();
+                    });
+
+                    gotoOptions.waitUntil = 'domcontentloaded';
+                    gotoOptions.timeout = 60000;
+                },
+            ],
+        });
+
+        const startUrls = this.generateStartUrls();
+        console.log(`🚀 Starting scraper with ${startUrls.length} URLs\n`);
+
+        await crawler.run(startUrls.map(url => {
+            // Determine label based on URL type
+            let label = 'SEARCH';
+            if (url.includes('/listing/')) {
+                label = 'PRODUCT';
+            } else if (url.includes('/shop/')) {
+                label = 'SHOP';
+            } else if (url.includes('/c/')) {
+                label = 'CATEGORY';
+            }
+            return { url, label };
+        }));
+
+        console.log(`\n✅ Complete! Scraped ${this.itemCount} products`);
+    }
+
+    private getSearchTargets(): Array<{ type: 'url'; url: string } | { type: 'query'; query: string }> {
+        const targets: Array<{ type: 'url'; url: string } | { type: 'query'; query: string }> = [];
+
+        const urlList = this.input.searchUrls?.filter((u) => u?.trim()) ?? [];
+        if (urlList.length > 0) {
+            for (const raw of urlList) {
+                targets.push({ type: 'url', url: this.normalizeEtsySearchUrl(raw.trim()) });
+            }
+        } else if (this.input.searchUrl?.trim()) {
+            targets.push({ type: 'url', url: this.normalizeEtsySearchUrl(this.input.searchUrl.trim()) });
+        }
+
+        if (targets.length === 0 && this.input.query?.trim()) {
+            targets.push({ type: 'query', query: this.input.query.trim() });
+        }
+
+        return targets;
+    }
+
+    private buildSearchPageUrl(baseUrl: string, pageNumber: number): string {
+        const url = new URL(baseUrl);
+        url.searchParams.set('page', String(pageNumber));
+        return url.toString();
+    }
+
+    private async resolveDataDomeBlock(page: any, proxyInfo: any, context: string): Promise<void> {
+        const isBlocked = await this.dataDomeSolver.isBlocked(page);
+        if (!isBlocked) return;
+
+        console.log(`   ⚠️ Challenge detected on ${context}`);
+        const solved = await this.dataDomeSolver.solveDataDome(page, proxyInfo);
+        if (!solved) {
+            throw new Error(`${context} blocked`);
+        }
+        await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+    }
+
+    private async submitQuerySearch(page: any, searchQuery: string): Promise<void> {
+        console.log('   📝 Looking for search input...');
+        const searchSelectors = [
+            'input#global-enhancements-search-query',
+            'input[name="search_query"]',
+            'input[placeholder*="Search"]',
+            'input[type="search"]',
+            '#search-query',
+            '.wt-input-btn-group input',
+        ];
+
+        let searchInput = null;
+        for (const selector of searchSelectors) {
+            searchInput = await page.$(selector);
+            if (searchInput) {
+                const isVisible = await searchInput.isVisible().catch(() => false);
+                if (isVisible) {
+                    console.log(`   ✅ Found search input: ${selector}`);
+                    break;
+                }
+            }
+            searchInput = null;
+        }
+
+        if (!searchInput) {
+            const inputs = await page.$$eval('input', (els: any[]) =>
+                els.map((el: any) => ({ id: el.id, name: el.name, type: el.type, placeholder: el.placeholder }))
+            );
+            console.log('   Available inputs:', JSON.stringify(inputs.slice(0, 10)));
+            throw new Error('Search input not found');
+        }
+
+        await searchInput.click();
+        await this.naturalDelay(300, 600);
+
+        console.log(`   ⌨️ Typing: "${searchQuery}"`);
+        for (const char of searchQuery) {
+            await page.keyboard.type(char, { delay: 50 + Math.random() * 100 });
+        }
+        await this.naturalDelay(500, 1000);
+
+        console.log('   ⏎ Pressing Enter...');
+        await page.keyboard.press('Enter');
+
+        try {
+            await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+            await this.naturalDelay(2000, 3000);
+        } catch (e) {
+            console.log('   ⚠️ Timeout waiting for search results');
+        }
+    }
+
+    private async scrapeSearchResultPages(
+        page: any,
+        humanBehavior: HumanBehavior,
+        proxyInfo: any,
+        baseSearchUrl: string,
+        targetIndex: number,
+    ): Promise<void> {
+        const maxPages = this.input.maxPages;
+
+        for (let pageNum = 1; pageNum <= maxPages && this.itemCount < this.input.maxItems; pageNum++) {
+            if (pageNum > 1) {
+                const nextUrl = this.buildSearchPageUrl(baseSearchUrl, pageNum);
+                console.log(`   📄 Opening page ${pageNum}: ${nextUrl}`);
+                await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                await this.naturalDelay(2000, 3000);
+            }
+
+            await humanBehavior.naturalScroll(2);
+            await humanBehavior.randomMouseMovements(2);
+            await this.naturalDelay(1000, 2000);
+            await this.resolveDataDomeBlock(page, proxyInfo, `search results page ${pageNum}`);
+
             const pageTitle = await page.title();
             const listingCount = await page.$$eval('[data-palette-listing-id]', (els: any[]) => els.length);
-            console.log(`   📄 Page: "${pageTitle}" | Found ${listingCount} listing elements`);
+            console.log(`   📄 "${pageTitle}" | ${listingCount} listing elements on page ${pageNum}`);
 
-            // Save search results HTML for debugging
-            const html = await page.content();
-            await Actor.setValue('search-results.html', html, { contentType: 'text/html' });
+            if (pageNum === 1 && targetIndex === 0) {
+                const html = await page.content();
+                await Actor.setValue('search-results.html', html, { contentType: 'text/html' });
+            }
 
-            // Extract product data directly from search results
-            const products = await page.evaluate(() => {
+            const products = await this.extractProductsFromSearchPage(page);
+            console.log(`   📋 Extracted ${products.length} products from page ${pageNum}`);
+
+            const saved = await this.saveSearchProducts(products);
+            console.log(`   💾 Saved ${saved} new product(s) (total: ${this.itemCount})`);
+
+            if (products.length === 0) {
+                console.log('   ⏹️ No listings on this page, stopping pagination');
+                break;
+            }
+        }
+    }
+
+    private async extractProductsFromSearchPage(page: any): Promise<EtsyProduct[]> {
+        return page.evaluate(() => {
                 const items: any[] = [];
                 const jsonLdMap: Record<string, string> = {};
 
@@ -382,225 +652,28 @@ class EtsyScraper {
                 });
 
                 return items;
-            });
-
-            console.log(`📋 Extracted ${products.length} products from search results`);
-
-            // Filter and save products
-            const remaining = this.input.maxItems - this.itemCount;
-            const productsToSave = products.slice(0, remaining);
-
-            for (const product of productsToSave) {
-                if (this.passesFilters(product)) {
-                    console.log(`   ✅ "${product.title.substring(0, 50)}..." | $${product.price} | ⭐${product.rating}`);
-                    await this.pushProduct(product);
-                    this.itemCount++;
-                } else {
-                    console.log(`   ⏭️ Filtered out: ${product.title.substring(0, 30)}`);
-                }
-            }
         });
+    }
 
-        // Handle product pages (Direct access or if configured)
-        router.addHandler('PRODUCT', async ({ page, request, proxyInfo }) => {
-            console.log(`📦 Scraping product: ${request.url}`);
+    private async saveSearchProducts(products: EtsyProduct[]): Promise<number> {
+        let saved = 0;
+        const remaining = this.input.maxItems - this.itemCount;
 
-            // Initialize human behavior
-            const humanBehavior = new HumanBehavior(page);
-            await humanBehavior.initialize();
-
-            try {
-                await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
-                await this.naturalDelay(1000, 2000);
-            } catch (e) {
-                console.log('   ⚠️ Timeout waiting for page load');
+        for (const product of products) {
+            if (saved >= remaining) break;
+            if (this.seenProductIds.has(product.productId)) continue;
+            if (!this.passesFilters(product)) {
+                console.log(`   ⏭️ Filtered out: ${product.title.substring(0, 30)}`);
+                continue;
             }
+            this.seenProductIds.add(product.productId);
+            console.log(`   ✅ "${product.title.substring(0, 50)}..." | $${product.price} | ⭐${product.rating}`);
+            await this.pushProduct(product);
+            this.itemCount++;
+            saved++;
+        }
 
-            // Basic anti-bot movements
-            await humanBehavior.naturalScroll(2);
-
-            // Check for blocking
-            const isBlocked = await this.dataDomeSolver.isBlocked(page);
-            if (isBlocked) {
-                const solved = await this.dataDomeSolver.solveDataDome(page, proxyInfo);
-                if (!solved) {
-                    throw new Error('Page blocked');
-                }
-                await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
-            }
-
-            const product = await page.evaluate(() => {
-                try {
-                    // Basic Info
-                    const title = document.querySelector('h1')?.textContent?.trim() || '';
-                    const productId = window.location.href.match(/\/listing\/(\d+)/)?.[1] || '';
-                    
-                    // Price
-                    let price = 0;
-                    const priceEl = document.querySelector('[data-selector="price-only"]') || 
-                                   document.querySelector('.wt-text-title-03') ||
-                                   document.querySelector('[class*="price"]');
-                    if (priceEl) {
-                        const match = priceEl.textContent?.match(/[\d,]+\.?\d*/);
-                        if (match) price = parseFloat(match[0].replace(/,/g, ''));
-                    }
-
-                    // Shop Name - USING USER'S SELECTOR as primary method
-                    // Selector: #product_details_content_toggle > div > div:nth-child(1) > ul > div > li > div.wt-ml-xs-1.how-its-made-label-product-details > a
-                    let shopName = '';
-                    let shopUrl = '';
-                    
-                    // User provided selector (xpath style adapted to CSS)
-                    const userSelector = '#product_details_content_toggle > div > div:nth-child(1) > ul > div > li > div.wt-ml-xs-1.how-its-made-label-product-details > a';
-                    const userShopEl = document.querySelector(userSelector);
-                    
-                    if (userShopEl) {
-                        shopName = userShopEl.textContent?.trim() || '';
-                        shopUrl = userShopEl.getAttribute('href') || '';
-                    }
-                    
-                    // Fallback selectors for shop name
-                    if (!shopName) {
-                        const shopHeader = document.querySelector('a[href*="/shop/"]');
-                        if (shopHeader) {
-                            shopName = shopHeader.textContent?.trim() || '';
-                            shopUrl = shopHeader.getAttribute('href') || '';
-                        }
-                    }
-
-                    // Rating & Reviews
-                    let rating = 0;
-                    let reviewCount = 0;
-                    const reviewsBadge = document.querySelector('#reviews-link') || document.querySelector('a[href="#reviews"]');
-                    if (reviewsBadge) {
-                         const text = reviewsBadge.textContent || '';
-                         const countMatch = text.match(/(\d+)/);
-                         if (countMatch) reviewCount = parseInt(countMatch[1]);
-                         
-                         // Try to find rating stars near reviews
-                         const stars = document.querySelector('input[name="rating"]');
-                         if (stars) rating = parseFloat(stars.getAttribute('value') || '0');
-                    }
-
-                    const imageUrl = document.querySelector('img.wt-image')?.getAttribute('src') || '';
-
-                    if (shopUrl && !shopUrl.startsWith('http')) {
-                        shopUrl = `https://www.etsy.com${shopUrl}`;
-                    }
-
-                    return {
-                        productId,
-                        title,
-                        url: window.location.href,
-                        price,
-                        rating,
-                        reviewCount,
-                        shopName: shopName || 'N/A',
-                        shopUrl: shopUrl || '',
-                        imageUrl,
-                        scrapedAt: new Date().toISOString(),
-                    } as EtsyProduct;
-                } catch (e) {
-                    return null;
-                }
-            });
-
-            if (product && product.title) {
-                console.log(`   ✅ "${product.title.substring(0, 50)}..." | Shop: ${product.shopName}`);
-                await this.pushProduct(product);
-                this.itemCount++;
-            } else {
-                console.log('   ❌ Failed to extract product details');
-            }
-        });
-
-        const crawler = new PlaywrightCrawler({
-            proxyConfiguration,
-            requestHandlerTimeoutSecs: 120,
-            useSessionPool: true,
-            persistCookiesPerSession: true,
-            requestHandler: router,
-
-            // CRITICAL: Rate limiting to avoid DataDome detection on product pages
-            // Product pages get detected when navigating too fast
-            minConcurrency: 1,
-            maxConcurrency: 1, // Force sequential processing (ignore input)
-            maxRequestsPerMinute: 12, // ~5 seconds between requests
-
-            // DISABLE Crawlee's fingerprinting - let rebrowser-playwright handle it
-            // Crawlee's fingerprint injection can interfere with rebrowser's CDP patches
-            browserPoolOptions: {
-                useFingerprints: false,
-            },
-
-            sessionPoolOptions: {
-                blockedStatusCodes: [], // DataDome uses 403s, don't mark as blocked
-                maxPoolSize: 10,
-            },
-
-            launchContext: {
-                // CRITICAL: Use rebrowser-playwright for CDP detection evasion
-                // This patches Chrome DevTools Protocol which DataDome monitors
-                launcher: chromium,
-                launchOptions: {
-                    headless: false, // IMPORTANT: headless mode has different fingerprints
-                },
-            },
-
-            preNavigationHooks: [
-                async ({ request, page }, gotoOptions) => {
-                    // NOTE: rebrowser-playwright handles CDP detection
-                    // Don't inject manual anti-detection scripts - they can interfere
-
-                    // Set realistic viewport (common desktop resolution)
-                    await page.setViewportSize({
-                        width: 1920,
-                        height: 1080
-                    });
-
-                    // BLOCKING: Reduce bandwidth by blocking unnecessary resources
-                    await page.route('**/*', (route: any) => {
-                        const request = route.request();
-                        const resourceType = request.resourceType();
-                        const url = request.url();
-
-                        // Block heavy resources (NOT stylesheets - blocking CSS is a detection vector)
-                        if (['image', 'media', 'font'].includes(resourceType)) {
-                            return route.abort();
-                        }
-
-                        // Block specific analytics and tracking scripts (optional but good for speed)
-                        if (url.includes('google-analytics') || url.includes('facebook.net') || url.includes('doubleclick')) {
-                            return route.abort();
-                        }
-
-                        // Continue all other requests
-                        return route.continue();
-                    });
-
-                    gotoOptions.waitUntil = 'domcontentloaded';
-                    gotoOptions.timeout = 60000;
-                },
-            ],
-        });
-
-        const startUrls = this.generateStartUrls();
-        console.log(`🚀 Starting scraper with ${startUrls.length} URLs\n`);
-
-        await crawler.run(startUrls.map(url => {
-            // Determine label based on URL type
-            let label = 'SEARCH';
-            if (url.includes('/listing/')) {
-                label = 'PRODUCT';
-            } else if (url.includes('/shop/')) {
-                label = 'SHOP';
-            } else if (url.includes('/c/')) {
-                label = 'CATEGORY';
-            }
-            return { url, label };
-        }));
-
-        console.log(`\n✅ Complete! Scraped ${this.itemCount} products`);
+        return saved;
     }
 
     /**
@@ -629,7 +702,7 @@ class EtsyScraper {
         const urls: string[] = [];
 
         // Warm up on homepage first, then navigate to searchUrl or type query
-        if (this.input.query || this.input.searchUrl) {
+        if (this.input.query || this.input.searchUrl || (this.input.searchUrls?.length ?? 0) > 0) {
             urls.push('https://www.etsy.com');
         }
 
