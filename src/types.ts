@@ -4,8 +4,7 @@ import { z } from 'zod';
 export const InputSchema = z.object({
     // Search parameters
     query: z.string().optional(),
-    searchUrl: z.string().optional(),
-    searchUrls: z.array(z.string().url()).optional(),
+    searchUrl: z.union([z.string().url(), z.array(z.string().url())]).optional(),
     categoryUrl: z.string().url().optional(),
     shopUrl: z.string().url().optional(),
     productUrls: z.array(z.string().url()).optional(),
