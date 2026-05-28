@@ -15,6 +15,14 @@ export class HumanBehavior {
         this.page = page;
     }
 
+    private isPageAlive(): boolean {
+        try {
+            return !this.page.isClosed();
+        } catch {
+            return false;
+        }
+    }
+
     /**
      * Initialize ghost cursor for human-like mouse movements with Bezier curves
      * CRITICAL: createCursor returns a Promise
@@ -47,7 +55,10 @@ export class HumanBehavior {
      * Human-like scrolling with mouse movement and variable speed
      */
     async naturalScroll(scrollCount: number = 3): Promise<void> {
+        if (!this.isPageAlive()) return;
+
         for (let i = 0; i < scrollCount; i++) {
+            if (!this.isPageAlive()) return;
             // Variable scroll distance (not uniform)
             const scrollAmount = 150 + Math.random() * 450; // 150-600px
             const scrollSpeed = 50 + Math.random() * 150;
@@ -67,13 +78,16 @@ export class HumanBehavior {
             // Delay before scroll (humans pause)
             await this.randomDelay(200, 800);
 
-            // Perform scroll with smooth behavior
-            await this.page.evaluate((distance) => {
-                window.scrollBy({
-                    top: distance,
-                    behavior: 'smooth'
-                });
-            }, scrollAmount);
+            try {
+                await this.page.evaluate((distance) => {
+                    window.scrollBy({
+                        top: distance,
+                        behavior: 'smooth'
+                    });
+                }, scrollAmount);
+            } catch {
+                return;
+            }
 
             // Wait for scroll + reading time
             const waitTime = scrollSpeed + this.calculateReadingTime(1);
@@ -85,21 +99,21 @@ export class HumanBehavior {
      * Random mouse movements across page (simulates browsing)
      */
     async randomMouseMovements(count: number = 3): Promise<void> {
-        if (!this.cursor) {
+        if (!this.cursor || !this.isPageAlive()) {
             return;
         }
 
         for (let i = 0; i < count; i++) {
-            try {
-                // Get random point on viewport (with 10% padding from edges)
-                const randomPoint = await this.cursor.getRandomPointOnViewport(0.1);
+            if (!this.isPageAlive()) return;
 
-                // Move with Bezier curves and random timing
+            try {
+                const randomPoint = await this.cursor.getRandomPointOnViewport(0.1);
                 await this.cursor.actions.move(randomPoint, {
-                    waitBeforeMove: [500, 1500]  // Random delay before moving
+                    waitBeforeMove: [300, 800],
                 });
-            } catch (error) {
-                // Continue even if cursor movement fails
+            } catch (error: any) {
+                const msg = error?.message || '';
+                if (msg.includes('closed') || msg.includes('Target page')) return;
             }
         }
     }
