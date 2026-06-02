@@ -29,7 +29,7 @@
     "maxPages": {
       "title": "Maximum search pages",
       "type": "integer",
-      "description": "How many result pages to open per search (page=1, page=2, ...). Stops early when maxItems is reached or a page has no listings.",
+      "description": "How many result pages to open per search (page=1, page=2, ...). Stops early when maxItems is reached or Etsy returns an empty results page. Pages with no \"Popular now\" items are skipped and pagination continues.",
       "default": 1,
       "minimum": 1,
       "maximum": 50,
