@@ -222,7 +222,8 @@ class EtsyScraper {
         });
 
         // Homepage + DataDome + N pages with human delays can exceed 120s (see maxPages)
-        const requestHandlerTimeoutSecs = Math.min(900, 180 + this.input.maxPages * 90);
+        // ~30–45s per page with light pagination; cap at 1 hour for large maxPages (e.g. 30)
+        const requestHandlerTimeoutSecs = Math.min(3600, 120 + this.input.maxPages * 55);
 
         const crawler = new PlaywrightCrawler({
             proxyConfiguration,
@@ -450,8 +451,13 @@ class EtsyScraper {
             const saved = await this.saveSearchProducts(products);
             console.log(`   💾 Saved ${saved} new product(s) (total: ${this.itemCount})`);
 
-            if (products.length === 0) {
-                console.log('   ⏹️ No listings on this page, stopping pagination');
+            if (products.length === 0 && listingCount > 0) {
+                console.log(`   ⏭️ No "Popular now" items on page ${pageNum} (${listingCount} listings), continuing...`);
+            }
+
+            // Only stop when Etsy returns no result cards (end of search), not when Popular now filter matches nothing
+            if (listingCount === 0) {
+                console.log('   ⏹️ Empty search results page, stopping pagination');
                 break;
             }
         }
